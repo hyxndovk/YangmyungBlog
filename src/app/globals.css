@@ -1,0 +1,120 @@
+@font-face {
+  font-family: NotoSansKR;
+  src: url(./fonts/NotoSansKR-VariableFont_wght.ttf);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  word-break:break-all;
+}
+
+body{
+  margin: 0;
+  font-family: NotoSansKR;
+}
+
+a:link{
+  color: #000000;
+  text-decoration: none;
+}
+
+a:visited{
+  color: #000000;
+  text-decoration: none;
+}
+
+a:hover { 
+  text-decoration: none;
+  color: #6a6a6a;
+}
+
+.Page{
+
+}
+
+.Header{
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #ffffff;
+  height: 80px;
+  border-bottom: 2px solid #e3e3e3;
+  width: 100%;
+  position: fixed;
+}
+
+.GoToHome{
+  font-size: 30px;
+  margin-left: 30px;
+  font-weight: bold;
+}
+
+.PostPreviews{
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 22rem);
+  justify-content: space-evenly;
+  gap: 1rem;
+}
+
+.Posts{
+  border: #e3e3e3 2px solid;
+  border-radius: 12px;
+  width: 100%;
+  height: 100%;
+  padding: 24px;
+}
+
+.Body{
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-rows: 80px 100% 50px;
+  grid-row-gap: 20px
+}
+
+.Footer{
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.PostTitle{
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.PostSubtitle{
+  font-size: 16px;
+  font-weight: 500;
+  color: #626262;
+  margin-top: 10px;
+}
+
+.PostDate{
+  font-size: 16px;
+  font-weight: 500;
+  color: #626262;
+  margin-top: 20px;
+  text-align: right;
+}
+
+.PostPage{
+  width: 100%;
+  height: 100%;
+  padding: 40px;
+}
+
+.inPostTitle{
+  padding-bottom: 20px;
+  font-size: 42px;
+  font-weight: 800;
+  border-bottom: #e3e3e3 2px solid;
+}
+
+.PostContent{
+  margin-top: 40px;
+}
