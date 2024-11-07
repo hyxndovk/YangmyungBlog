@@ -1,129 +1,84 @@
 ---
-title: "Create retro games with PICO-8"
-subtitle: "8-bit games are a great way to learn and expand your portfolio."
-date: "2020-12-19"
-cr: ["https://www.artstation.com/shizuorin"]
+title: "2-4게시판"
+subtitle: "게시판"
+date: "2021-07-12"
 ---
 
-After watching [High Score](https://www.youtube.com/watch?v=B4jopG1wX88) on Netflix, I was suddenly inspired to develop a retro-style game. I think it was a combination of the aesthetics and nostalgia that motivated me.
+The [SaaS (software as a service)](https://en.wikipedia.org/wiki/Software_as_a_service) model underpins many of today's successful new businesses. Knowing how to build one from start to finish is probably a useful addition to any software developer's skill set.
 
-It turned out to be a pretty fun experience, and something I'd recommend as a weekend project to any developer. With tools like [PICO-8](https://www.lexaloffle.com/pico-8.php) (a NES-like virtual console), it's really easy to get started — even if you're a beginner to programming.
+But even when you strip a SaaS product of its business logic, there's still a non-trivial amount of work and trade-offs to consider.
 
-In this post, I'll be discussing why you should try your hand at retro-game development, and explain some of the technical limitations you'll be facing.
+In this project, my goal was to build a fully serverless SaaS web-app with authentication and payments — the two vital organs of any business.
 
-![images/pico-8 demo](/images/jelpi_demo.gif)
+My implementation is opinionated (as you'll see), and intended to serve as a starting point for new SaaS ideas in the future. Here's what's included:
 
-## Why you should build a retro game
+- [Authentication](#authentication)
+- [Payments (Stripe)](#payments-stripe)
+- [Frontend (React)](#frontend-react)
+- [Backend API](#backend-api)
+- [Serverless architecture](#serverless-architecture)
+- [Infrastructure as code](#infrastructure-as-code)
+- [CRUD operations](#crud-operations)
+- [Lessons Learnt](#lessons-learnt)
 
-For new programmers especially, a retro game project is:
+You can view the example at https://saas-starter-stack.com/app/ and the source on [GitHub](https://github.com/pixegami/saas-starter). In this post, I'll be reflecting on my choices and experience for each of the above features.
 
-- A great way to learn programming.
-- An excellent addition to your portfolio.
-- An effective way of prototyping new ideas (see [CELESTE](<https://en.wikipedia.org/wiki/Celeste_(video_game)>)).
+### Authentication
 
-The constraints of using "retro technology" creates a harsh environment to develop in.
+**Don't roll your own auth!** It's hard, and mistakes can be devastating to a business. With that said, I did it anyway — mostly to learn from it. Here's also some [discussion on Hackernews](https://news.ycombinator.com/item?id=22001918) on why you might want to build your own auth.
 
-But at the same time, you won't have to worry about learning a hundred different libraries, monetization funnels, or how to get it running on four different platforms.
+I used [bcrypt](https://codahale.com/how-to-safely-store-a-password/) and [JSON Web Tokens](https://jwt.io/), and stored credentials on DynamoDB. That part wasn't so bad. The real grind came from building things like exponential back-offs for failed attempts, account verification and reset mechanisms, and patching all the security edge cases.
 
-Essentially, you get to focus purely on the technical and creative problems of the game itself.
+I got it to a roughly working state, and then called it a day. If this was a production system, I'd probably look into something like [Cognito](https://aws.amazon.com/cognito/), [Firebase](https://firebase.google.com/products/auth) or [Okta](https://www.okta.com/).
 
-## What is PICO-8?
+### Payments (Stripe)
 
-From the [PICO-8](https://www.lexaloffle.com/pico-8.php) official website:
+From payments integration, [Stripe](https://stripe.com) was an easy choice. No prominent alternative come to mind, and I've heard high praises about Stripe's developer onboarding experience.
 
-> PICO-8 is a [fantasy console](https://www.lexaloffle.com/pico-8.php?page=faq) for making, sharing and playing tiny games and other computer programs. It _feels_ like a regular console, but runs on Windows / Mac / Linux.
+I set up [subscription payment](https://stripe.com/en-au/billing) integration with the project, and I think the developer experience lives up to expectations. The tutorials were well structured and concise.
 
-Basically, it's a program that pretends to be a console. It costs $15 to buy. You can use it to both play _and_ create your games. You can, of course, use an external editor (like [VSCode](https://code.visualstudio.com/)) with it as well.
+But the little thing that impressed me the most was when I typed in 'test card' in a [search box](https://stripe.com/docs/testing), it actually just straight up gave me a card-number I could copy straight to my clipboard. Whoever thought of that just saved me a click, and I'm grateful.
 
-You write code for it in [Lua](https://www.lua.org/) (if you haven't used that language before, don't worry — you'll pick it up in a day). The art and sound can be created directly in the console's editor, to be used in your game.
+### Frontend (React)
 
-![images/pico-8-code-editor](/images/pico-8-code-editor.png)
+The frontend is a responsive web-app build with [React](https://reactjs.org/). It seems like React is still the dominant technology is the area, although I've yet to try its main competitors like [Vue](https://vuejs.org/) or [Svelte](https://svelte.dev/).
 
-Finally, you can even export them to HTML so your friends (and recruiters?) can check it out from their phone.
+I used [TailWindCSS](https://tailwindcss.com/) for styling, and prefer to anything I've tried in the past (Boostrap CSS, Semantic UI and just vanilla CSS).
 
-I'd say the learning curve from zero to [Pong](https://en.wikipedia.org/wiki/Pong) is just a matter of hours (or days, at most).
+I then used [Gatsby](https://www.gatsbyjs.com/) to optimize the static site rendering — but I'm not sure if the extra steps are worth it at this stage. It's better for SEO and performance, but costs extra development cycles.
 
-The best way to get started is to follow the [official manual](https://www.lexaloffle.com/pico-8.php?page=manual), or [watch a video](https://www.youtube.com/watch?v=K5RXMuH54iw).
+Overall though, I was quite satisfied with this stack for the frontend, and would be happy to use it for production.
 
-## PICO-8's technical specs
+### Backend API
 
-You only have a palette of `16` colours, your canvas is `128` pixels wide and your whole program needs to fit within `65536` characters. There's almost no framework library to learn — aside from a handful of helper functions that would probably fit on a [napkin if written out](https://www.lexaloffle.com/bbs/files/16585/PICO-8_Cheat-Sheet_0-9-2.png).
+The backend is a serverless REST API implemented in Python and hosted as [Lambda functions](https://aws.amazon.com/lambda/) behind API Gateway.
 
-Comparing it to actual retro console specs, it's somewhere between a [NES](https://en.wikipedia.org/wiki/Nintendo_Entertainment_System) and an [Atari](https://en.wikipedia.org/wiki/Atari).
+My main challenge here was to abstract away the lower level things (like CORS, HTTP response formatting, database access) as much as possible. I did this via [Lambda layers](https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html), which allowed me to group a bunch of Python packages and common scripts together.
 
-|                    | PICO-8    | Atari     | NES       |
-| ------------------ | --------- | --------- | --------- |
-| **Year**           | 2015      | 1977      | 1985      |
-| **Resolution**     | 128 x 128 | 160 x 192 | 256 x 240 |
-| **Colors**         | 16        | 128       | 52        |
-| **Cartridge Size** | 32 kB     | 4 kB      | 128 kB    |
+This allowed me to implement handlers that are quite short and readable, which is think is key to maintainability.
 
-## Code examples
+### Serverless architecture
 
-Here's a couple of snippets of PICO-8 code to give you an idea of what development looks like.
+Why serverless? I think for a lot of businesses it simply wins out from a cost and scaling perspective. I could probably serve north of 500k API requests for [less than a dollar](https://aws.amazon.com/lambda/pricing/).
 
-### Game Loop
+However, this implies that the choice of database must be serverless as well. I chose [DynamoDB](https://aws.amazon.com/dynamodb/) just for the ease of integration. But if I had different data modeling requires (for which the DynamoDB architecture might be unfit), I might look into [Aurora](https://aws.amazon.com/rds/aurora/) or [Fauna](https://fauna.com/).
 
-The first thing to note is that the game has a special function called `_update()` which is invoked at 30 FPS. This will probably be the main driving force behind your game logic. In this snippet, we create a variable `f`, which increases by `1` each update — effectively counting the number of frames since the game loaded.
+### Infrastructure as code
 
-```lua
--- this is a global variable
-f = 0
+Configuring infrastructure is time-consuming and error prone. If I want to be able to deploy a copy of this service quickly, I'd have to [model it as code (IaC)](https://en.wikipedia.org/wiki/Infrastructure_as_code). In keeping theme with my AWS integration so far, I've modeled this project with [AWS CDK](https://docs.aws.amazon.com/cdk/latest/guide/home.html) in Typescript.
 
--- this is a special function that pico-8 invokes 30 times per second.
-function _update()
-    f += 1
-end
-```
+With this the entire frontend and backend can be deployed to a brand new account or domain in less than 30 minutes with just a [few configuration changes](https://github.com/pixegami/saas-starter/blob/master/saas-infrastructure/service.config.json).
 
-### Rendering a sprite
+### CRUD operations
 
-You can draw sprites (images) with the pixel art editor directly in the console. In PICO-8, you have 16 colors to choose from.
+Finally, I've added some simple Twitter-like posting capabilities to the project just as a stub for the actual business logic. It has ways to interact with the authentication API, and find out whether a user is verified, and if they are a paying subscriber.
 
-![images/pico-8-sprite-editor](/images/pico-8-sprite-editor.png)
+## Closing Thoughts
 
-Each sprite has an ID, which can then be used to render it on the screen at the x and y position you specify. Another special in-built function of PICO-8 is `_draw()`, which also executes at 30 FPS, but is guaranteed to execute after `_update()`.
+Honestly, I'm so tired of this project already. It was a lot more complex than I expected — especially for an app that really doesn't do _anything_! But I did learn a lot along the way though, and will probably be faster the second time around.
 
-```lua
-x = 64
-y = 64
+My top three takeaways are:
 
-function _draw()
-  cls(0) -- clear the screen and set it to color 0 (black).
-  spr(1, x, y) -- draw the sprite ID 1 at (x, y)
-end
-```
-
-This will draw the above sprite (ID 1) at (64, 64) at the centre of the screen.
-
-![images/pico-8-draw-sprite](/images/pico-8-draw-sprite.png)
-
-### Capturing player input
-
-PICO-8 detects user input via the `btn(k)` function, which returns true with the button with ID `k` is being pressed by the player. `k` ranges from 0 to 6 for a single player, and each number represents either the arrow keys, or two arbitrary game-play buttons like the `A` and `B` on a NES controller.
-
-![images/nes_controller](/images/classic_nes_controller.jpg)
-
-Adding this snippet to the rendering one above will allow us to move the character.
-
-```lua
-function _update()
-  if btn(0) then x -= 2 end -- move left
-  if btn(1) then x -+ 2 end -- move right
-end
-```
-
-![images/pico-8-movement](/images/pico-8-movement.gif)
-
-## Ideas to get started
-
-So, if you like the sound of creating your own retro-game from scratch — either to pad your CV with an extra project, or just to learn and have fun, head over to [PICO-8](https://www.lexaloffle.com/pico-8.php) to get started! I recommend first just following the [manual](https://www.lexaloffle.com/pico-8.php?page=manual).
-
-Once you've nailed the basics, here are some classic titles you could try to implement (and possibly extend):
-
-- [Pong](https://en.wikipedia.org/wiki/Pong) (1972)
-- [Space Invaders](https://en.wikipedia.org/wiki/Space_Invaders) (1978)
-- [Pac-Man](https://en.wikipedia.org/wiki/Pac-Man) (1980)
-- [Snake](<https://en.wikipedia.org/wiki/Snake_(video_game_genre)>) (1997)
-
-Or if you're feeling more ambitious, you could even try to implement a [Mario](https://en.wikipedia.org/wiki/Super_Mario_Bros.) clone!
+- Don't build your own auth.
+- You'll probably rebuild the project at least once or twice, so design things to be flexible.
+- Having integration tests really paid off.

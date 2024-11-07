@@ -1,285 +1,84 @@
 ---
-title: "Using AI to generate poetry"
-subtitle: "I used GPT-3 to generate poetry and other creative content."
-date: "2021-08-27"
+title: "게시판테스트"
+subtitle: "테스트"
+date: "2021-07-12"
 ---
 
-I was recently granted access to the [OpenAI GPT-3 Beta](https://beta.openai.com/), a very powerful language model that can be used to do all sorts of magic like chat bot generation, article summary, and a [lot more cool stuff](https://beta.openai.com/examples).
+The [SaaS (software as a service)](https://en.wikipedia.org/wiki/Software_as_a_service) model underpins many of today's successful new businesses. Knowing how to build one from start to finish is probably a useful addition to any software developer's skill set.
 
-But the application that really excited me was creative writing (stuff like SEO generation is cool and all, but a also a bit dry for my taste).
+But even when you strip a SaaS product of its business logic, there's still a non-trivial amount of work and trade-offs to consider.
 
-I had previously seen [AI Dungeon](https://play.aidungeon.io/) use GPT to create an interactive text adventure game (try it, it's fun!) and that got me curious about what else the AI was capable of — especially when elements of both _creativity_ and _structure_ were involved.
+In this project, my goal was to build a fully serverless SaaS web-app with authentication and payments — the two vital organs of any business.
 
-I decided to test it against poetry and story generation, and this is the resulting write-up of those experiments.
+My implementation is opinionated (as you'll see), and intended to serve as a starting point for new SaaS ideas in the future. Here's what's included:
 
-## What is GPT-3?
+- [Authentication](#authentication)
+- [Payments (Stripe)](#payments-stripe)
+- [Frontend (React)](#frontend-react)
+- [Backend API](#backend-api)
+- [Serverless architecture](#serverless-architecture)
+- [Infrastructure as code](#infrastructure-as-code)
+- [CRUD operations](#crud-operations)
+- [Lessons Learnt](#lessons-learnt)
 
-[GPT-3](https://arxiv.org/abs/2005.14165) is a language model developed by [OpenAI](https://beta.openai.com/). To the average developer (like me), it's basically a magical black-box that is extremely powerful at natural language use-cases.
+You can view the example at https://saas-starter-stack.com/app/ and the source on [GitHub](https://github.com/pixegami/saas-starter). In this post, I'll be reflecting on my choices and experience for each of the above features.
 
-It was trained on an estimated **45 TB** of text data (pretty much anything that is publicly available on the internet)!
+### Authentication
 
-We can literally ask it to do anything. For example, if I ask for steps to bake a cake it gives me:
+**Don't roll your own auth!** It's hard, and mistakes can be devastating to a business. With that said, I did it anyway — mostly to learn from it. Here's also some [discussion on Hackernews](https://news.ycombinator.com/item?id=22001918) on why you might want to build your own auth.
 
-```
-1. Preheat oven to 350°F.
-2. Grease and flour a 9-inch round cake pan.
-3. Stir cake mix, oil, eggs, and water in a large bowl with a spoon until blended.
-4. Pour batter into prepared pan.
-```
+I used [bcrypt](https://codahale.com/how-to-safely-store-a-password/) and [JSON Web Tokens](https://jwt.io/), and stored credentials on DynamoDB. That part wasn't so bad. The real grind came from building things like exponential back-offs for failed attempts, account verification and reset mechanisms, and patching all the security edge cases.
 
-Alternatively, I can provide it with an example of what I want. Such as:
+I got it to a roughly working state, and then called it a day. If this was a production system, I'd probably look into something like [Cognito](https://aws.amazon.com/cognito/), [Firebase](https://firebase.google.com/products/auth) or [Okta](https://www.okta.com/).
 
-```
-[15 mins] Walk or jog lightlyy to warm up.
-[10 mins] 3 sets of Squats
-```
+### Payments (Stripe)
 
-And it will understand that we're writing a work-out routine, and continue in that style — responding with something like this:
+From payments integration, [Stripe](https://stripe.com) was an easy choice. No prominent alternative come to mind, and I've heard high praises about Stripe's developer onboarding experience.
 
-```
-[10 mins] 3 sets of Push ups (use the bench/steps if you can't do regular ones)
-[10 mins] 3 sets of Lunges
-[10 mins] 3 sets of Sit ups
-[10 mins] 3 sets of Tricep dips
-[10 mins] 3 sets of
-```
+I set up [subscription payment](https://stripe.com/en-au/billing) integration with the project, and I think the developer experience lives up to expectations. The tutorials were well structured and concise.
 
-It can also do some pretty zany stuff, like translating from English to emoji.
+But the little thing that impressed me the most was when I typed in 'test card' in a [search box](https://stripe.com/docs/testing), it actually just straight up gave me a card-number I could copy straight to my clipboard. Whoever thought of that just saved me a click, and I'm grateful.
 
-```
-I love pizza and beer.
-😀❤️🍕🍺
+### Frontend (React)
 
-I flew to Japan and ate some Sushi.
-✈️🇯🇵😋 🍣
+The frontend is a responsive web-app build with [React](https://reactjs.org/). It seems like React is still the dominant technology is the area, although I've yet to try its main competitors like [Vue](https://vuejs.org/) or [Svelte](https://svelte.dev/).
 
-I was snowboarding in France.
-🏂❄️🇫🇷
-```
+I used [TailWindCSS](https://tailwindcss.com/) for styling, and prefer to anything I've tried in the past (Boostrap CSS, Semantic UI and just vanilla CSS).
 
-So as you can see, there's just endless amount of ways you can interact with the AI.
+I then used [Gatsby](https://www.gatsbyjs.com/) to optimize the static site rendering — but I'm not sure if the extra steps are worth it at this stage. It's better for SEO and performance, but costs extra development cycles.
 
-It's up to us to experiment with it and see how it can be useful for any particular problem. Let's give it a go!
+Overall though, I was quite satisfied with this stack for the frontend, and would be happy to use it for production.
 
-## 💡 Method
+### Backend API
 
-Today, I want to see if this AI is able to understand and generate poetry. Why poetry? Because I think it's a relatively simple example, and has three distinct dimensions that we can easily assess it on:
+The backend is a serverless REST API implemented in Python and hosted as [Lambda functions](https://aws.amazon.com/lambda/) behind API Gateway.
 
-- Tone
-- Content
-- Structure
+My main challenge here was to abstract away the lower level things (like CORS, HTTP response formatting, database access) as much as possible. I did this via [Lambda layers](https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html), which allowed me to group a bunch of Python packages and common scripts together.
 
-OpenAI lets customers interact with GPT-3 via an API, so that's how I'll be using it as well.
+This allowed me to implement handlers that are quite short and readable, which is think is key to maintainability.
 
-I'll be providing both direct requests and examples (with increasing complexity), and let the AI come up with **20 responses** for each prompt.
+### Serverless architecture
 
-Additionally, for my example prompts, I'll avoid using existing text—the AI may have already seen it in the training data and that might skew the results.
+Why serverless? I think for a lot of businesses it simply wins out from a cost and scaling perspective. I could probably serve north of 500k API requests for [less than a dollar](https://aws.amazon.com/lambda/pricing/).
 
-I'll then talk about the best samples in each batch and anything I find interesting about them.
+However, this implies that the choice of database must be serverless as well. I chose [DynamoDB](https://aws.amazon.com/dynamodb/) just for the ease of integration. But if I had different data modeling requires (for which the DynamoDB architecture might be unfit), I might look into [Aurora](https://aws.amazon.com/rds/aurora/) or [Fauna](https://fauna.com/).
 
-Also I've pushed the [full set of results on GitHub](https://github.com/pixegami/gpt-3-poetry-results) if you wanted to check out the rest of the samples.
+### Infrastructure as code
 
-## 🧪 Results
+Configuring infrastructure is time-consuming and error prone. If I want to be able to deploy a copy of this service quickly, I'd have to [model it as code (IaC)](https://en.wikipedia.org/wiki/Infrastructure_as_code). In keeping theme with my AWS integration so far, I've modeled this project with [AWS CDK](https://docs.aws.amazon.com/cdk/latest/guide/home.html) in Typescript.
 
-### ✍ Short poem
+With this the entire frontend and backend can be deployed to a brand new account or domain in less than 30 minutes with just a [few configuration changes](https://github.com/pixegami/saas-starter/blob/master/saas-infrastructure/service.config.json).
 
-As a baseline, I want to know how much the AI understands about the tone, structure and content of a 'poem.'
+### CRUD operations
 
-```
-[Prompt]
-Write a short poem.
+Finally, I've added some simple Twitter-like posting capabilities to the project just as a stub for the actual business logic. It has ways to interact with the authentication API, and find out whether a user is verified, and if they are a paying subscriber.
 
-[Sample AI Response]
-Snow is falling,
+## Closing Thoughts
 
-silently,
+Honestly, I'm so tired of this project already. It was a lot more complex than I expected — especially for an app that really doesn't do _anything_! But I did learn a lot along the way though, and will probably be faster the second time around.
 
-the ground a white blanket.
-Heroes dream in peace,
-where they sleep.
-```
+My top three takeaways are:
 
-It's a pretty good start! It's structured but it doesn't rhyme. The language and story also have a 'poetic' feel to it. Not bad.
-
-Amongst the other 20 samples were also hilarious rubbish like this one 🤡 :
-
-```
-[Sample AI Response]
-Life is like a beach
-Where we take our coconut and whack it
-or chew on it
-
-There are also other beaches
-Where we can drink some sand and ruminate
-```
-
-Not quite hitting the mark, but still pretty interesting.
-
-### ✍ Short poem with theme
-
-Next, I wanted to extend the prompt with some theme, just to see how it is able to assimilate that into its response.
-
-I picked a theme that isn't typically associated with poetry: **Space Exploration** (also because I've been watching a lot of old-school sci-fi stuff recently).
-
-```
-[Prompt]
-Write a short poem about space exploration.
-
-[Sample AI Response]
-I hope the stars align
-For I dream and explore
-Beyond what we see,
-With the most amazing views
-```
-
-It's definitely found a way to put the space theme in there — not too unnaturally either, because it still links it to 'emotional' concepts like 'dream', 'hope' and 'explore.'
-
-### ✍ Short poem with 2x themes
-
-Now I know it can handle one theme, let's add another one to the mix and see what happens. Something _not_ commonly associated with either poetry nor space (we want to challenge the AI right?) — how about...
-
-```
-[Prompt]
-Write a short poem about space exploration and parkour.
-
-[Sample AI Response]
-Taking the stars and reaching for the moon
-Afraid to look down
-She jumps, leaps, and lands
-```
-
-Not bad. Here's another sample.
-
-```
-[Sample AI Response]
-Parkour through the cosmos
-jump to the moon and land with a moonwalk
-push off from the Earth, do a headspin
-jump to Mars, make it look easy
-```
-
-I'm impressed that instead of just shoe-horning in the parkour theme, it's found words and phrases that have a natural connection with the space theme — like 'leap' and 'moonwalk.'
-
-It was at this point that the [vector aspect](https://jalammar.github.io/illustrated-gpt2/) of the model started to really click for me.
-
-It's as if it found the [cross-product](https://en.wikipedia.org/wiki/Cross_product) between the 'space' vector and the 'parkour' vector (this is a gross over-simplification), and applied that to the poem.
-
-### ✍ Children's Story (Rhyming Verse)
-
-My next task was to try something a bit more directed. This time I will give it a concrete example (with a tone, structure and story) to continue with.
-
-To keep it (relatively) easy for the AI, I started with a rhyming verse, like something from a Dr Seuss book:
-
-```
-[Prompt]
-It's a sunny day.
-And Milky wants to play!
-He looks for his ball,
-but it's not in the hall.
-```
-
-> By the way Milky's the name of my dog, and this literally is the story of his life every morning.
-
-Some of the results from this were super interesting. My favorite one is:
-
-```
-[Sample AI Response]
-It's not on the stairs.
-It's not in the yard.
-Maybe it's in the attic,
-somewhere really dark.
-```
-
-This one nails the tone — notice that it repeats the "It's not at \_\_\_" three times? That's just like what a children's book would do!
-
-It also introduces some progression and drama into the story. Now our character has an idea where the ball is (the attic), but there is a sense of danger and risk in the way (somewhere really dark).
-
-Structurally, "yard" and "dark" is also partial rhyme, but I think that was probably a fluke (out of the 20 samples, maybe only 2-3 managed to rhyme).
-
-Still, I was really impressed with this result. Here's something else that I observed as well:
-
-```
-[Sample AI Response]
-Then in through the window
-stumbles a dog with a bark.
-It's Billy, his brother.
-```
-
-_Dog!_ It figured out that Milky in this story is a dog, even though that was never explicitly mentioned in the prompt. It might be a small detail, but I was low-key amazed by that.
-
-### ✍ Fantasy Fiction
-
-Next let's test GPT-3's ability for creative story-telling as well. Here's a rhyming story with a bit of drama, written in a high-fantasy style:
-
-```
-[Prompt]
-A mysterious curse sweeps the land,
-and into townsfolk's hearts expand.
-One broken link and night shall fall,
-eternal sleep will enslave them all.
-
-But there is hope
-```
-
-I ended the prompt with `But there is hope` because I was interested to see if the AI can progress (and negate!) the verse before it, rather than extend the example (which we already know it can do).
-
-The results for this prompt were probably the most entertaining for me to read. My favorite:
-
-```
-[Sample AI Response]
-a prophecy is spoken,
-Which tells of one who will restore the sun.
-She comes with a prince and shall break the spell,
-and together save the land from hell.
-```
-
-So many things I love about this response.
-
-- It introduces a _heroine_ to the story (+1 for gender diversity!)
-- It writes a sensible continuation of the prompt.
-- It even manages rhyming (between 'one/sun', and 'spell/hell').
-
-A lot of the other samples were also quite interesting (check them out [here](https://github.com/pixegami/gpt-3-poetry-results)) and full of creative ideas.
-
-### ✍ Hacker Rap
-
-And finally just for a bit of fun, let's see what it can do with hacker rap 🤣 :
-
-```
-[Prompt]
-When I'm tappin' I'm trapped in the screen
-I escape when the codebase is clean
-```
-
-I loved it's work here as well. It did a good job picking up on both structure (rhyme) and content.
-
-```
-[Sample AI Response]
-I can write code, I can code all night
-You are my code and I am your light
-We're in this together from dusk 'til dawn.
-We got the skill to make things run
-```
-
-I also found this particular choice of words interesting:
-
-```
-The refactoring was a success, great!
-And I will not commit the same crime
-So I'm testin', testin', testin, testin' again
-Just when I've seen enough, it happens again
-```
-
-"Commit the same crime" — does it know the significance of the word _commit_ for developers? 🤯
-
-## Wrap Up
-
-That's pretty much all I had to share this time around. GPT-3 has definitely impressed me with it's capabilities, and now I have a stronger understanding how this power can be wielded.
-
-In a batch of 20 samples, not all of them are great—but the good ones are sometimes _really_ good.
-
-If I wanted to use it in this way, I'd need a process that allows a human (me) to select and use the best samples.
-
-I hope this was interesting! I also covered everything here in a video as well (which I geared towards less technical viewers) which you can check out [here](https://www.youtube.com/watch?v=r3zKcL0iGeA&t=47s).
-
-Thanks for reading!
+- Don't build your own auth.
+- You'll probably rebuild the project at least once or twice, so design things to be flexible.
+- Having integration tests really paid off.
